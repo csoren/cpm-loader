@@ -1,6 +1,201 @@
+        INCLUDE "c128.inc"
+
+BIOS_PrintAutoText      EQU     $0526
+BIOS_VDCCopyCharset     EQU     $05BD
+BIOS_VDCSelectReg       EQU     $0945
+BIOS_8502               EQU     $0D22
+BIOS_8502_Size          EQU     $1C3
+BIOS_CPUSwitch          EQU     $0EE5
+BIOS_CPUSwitch_Size     EQU     31
+BIOS_MMUConfig          EQU     $0FAA
+BIOS_MMUConfig_Size     EQU     11
+BIOS_MMUConfig_Last     EQU     BIOS_MMUConfig+BIOS_MMUConfig_Size-1
+
         SECTION "Code",CODE
 
-        XDEF    Z80Begin
+        XDEF    Z80Entry
 
-Z80Begin:
-        rst     8
+ClearMemory: MACRO
+        ld      hl,\1
+        ld      de,\1+1
+        ld      bc,\2-\1-1
+        xor     a
+        ld      (hl),a
+        ldir
+        ENDM
+
+Z80Entry:
+        ld      sp,$3C77
+
+        ld      a,$3F
+        ld      (MMU_CR),a
+
+        ; Clear memory 3000-FEFF
+        ClearMemory $3000,CpmSys
+        ClearMemory CpmSysEnd,$FF00
+
+        ; Copy 8502 code to $3000
+        ld      hl,BIOS_8502
+        ld      de,CPM_8502
+        ld      bc,BIOS_8502_Size
+        ldir
+
+        ld      hl,BIOS_CPUSwitch
+        ld      de,EnableZ80
+        ld      bc,BIOS_CPUSwitch_Size
+        ldir
+
+        ld      a,$C9           ; Z80 RET
+        ld      (Return6502),a
+        call    Enable6502
+
+        ld      hl,BIOS_MMUConfig_Last
+        ld      bc,$D50A
+        ld      d,BIOS_MMUConfig_Size
+.initializeMMU
+        ld      a,(hl)
+        out     (c),a
+        dec     hl
+        dec     c
+        dec     d
+        jr      nz,.initializeMMU
+
+        ;ClearMemory $1000,$3000
+        ClearMemory $1000,Z80Entry
+        ClearMemory Z80End,$3000
+
+        ld      a,$1A           ; VDC colors
+        call    BIOS_VDCSelectReg
+        ld      a,$90
+        out     (c),a
+
+        ld      a,$83
+        ld      (VDCAttr),a
+
+        ld      a,$0E
+        ld      (VDCCharCol),a
+
+        call    BIOS_VDCCopyCharset
+
+        ld      a,$19
+        ld      (Rows),a
+
+        call    BIOS_PrintAutoText
+        
+        DB      $FF             ; Clear screen
+        DB      $81             ; Line 1
+        DB      $0A             ; Column 10
+        DB      'BOOTING CP/M PLUS',0
+
+.spin   jr      .spin
+
+        IF      0
+ROM:01F0 ; ---------------------------------------------------------------------------
+ROM:0208 ; ---------------------------------------------------------------------------
+ROM:0208                 ld      bc, unk_D018
+ROM:020B                 ld      a, 0B6h ; 'Â'
+ROM:020D                 out     (c), a
+ROM:020F                 call    LoadBootSector
+ROM:0212                 jp      nz, PrintNoCpmSys
+ROM:0215                 ld      hl, 0FB2h
+ROM:0218                 ld      (BlockLoadTable), hl
+ROM:021B                 call    sub_B4
+ROM:021E                 call    sub_B4
+ROM:0221                 ld      hl, (unk_3C09)
+ROM:0224                 ld      a, h
+ROM:0225                 or      l
+ROM:0226                 jp      z, PrintNoCpmSys
+ROM:0229
+ROM:0229 loc_229:                                ; CODE XREF: sub_2FA:loc_321j
+ROM:0229                 ld      hl, 3C09h
+ROM:022C                 ld      (BlockLoadTable), hl
+ROM:022F                 call    sub_36D
+ROM:0232                 ld      hl, 3400h
+ROM:0235                 ld      de, 3C29h
+ROM:0238                 ld      bc, 0Ch
+ROM:023B                 ldir
+ROM:023D                 call    PrintAutoText
+ROM:023D ; ---------------------------------------------------------------------------
+ROM:0240                 db 8Ah
+ROM:0241                 db    0
+ROM:0242                 db 0
+ROM:0243 ; ---------------------------------------------------------------------------
+ROM:0243                 ld      hl, 3480h
+ROM:0246                 call    PrintText
+ROM:0249                 ld      hl, 3500h
+ROM:024C                 ld      (unk_3C04), hl
+ROM:024F                 call    PrintAutoText
+ROM:024F ; ---------------------------------------------------------------------------
+ROM:0252                 db 83h
+ROM:0253                 db 0Ch
+ROM:0254 aDataTables:    .ascii 'DATA TABLES',0
+ROM:0260 ; ---------------------------------------------------------------------------
+ROM:0260                 ld      hl, (unk_3C33)
+ROM:0263                 ld      (unk_FD09), hl
+ROM:0266                 ld      hl, 3C32h
+ROM:0269                 call    sub_331
+ROM:026C                 ld      (unk_FD0B), hl
+ROM:026F
+ROM:026F loc_26F:                                ; CODE XREF: sub_0+276j
+ROM:026F                 call    sub_344
+ROM:0272                 ld      de, 80h ; 'Ç'
+ROM:0275                 add     hl, de
+ROM:0276                 jr      nz, loc_26F
+ROM:0278                 call    PrintAutoText
+ROM:0278 ; ---------------------------------------------------------------------------
+ROM:027B                 db 84h
+ROM:027C                 db 0Ch
+ROM:027D aCommonCode:    .ascii 'COMMON CODE',0
+ROM:0289 ; ---------------------------------------------------------------------------
+ROM:0289                 ld      hl, 3C2Ah
+ROM:028C                 call    sub_324
+ROM:028F                 call    PrintAutoText
+ROM:028F ; ---------------------------------------------------------------------------
+ROM:0292                 db 85h
+ROM:0293                 db 0Ch
+ROM:0294 aBankedCode:    .ascii 'BANKED CODE',0
+ROM:02A0 ; ---------------------------------------------------------------------------
+ROM:02A0                 ld      hl, 3C2Ch
+ROM:02A3                 call    sub_324
+ROM:02A6                 call    PrintAutoText
+ROM:02A6 ; ---------------------------------------------------------------------------
+ROM:02A9                 db 86h
+ROM:02AA                 db 0Ch
+ROM:02AB aBios8502Code:  .ascii 'BIOS8502 CODE',0
+ROM:02B9 ; ---------------------------------------------------------------------------
+ROM:02B9                 ld      hl, 3C30h
+ROM:02BC                 call    sub_324
+ROM:02BF                 ld      a, (unk_3C30)
+ROM:02C2                 ld      b, a
+ROM:02C3                 ld      a, (unk_3C2F)
+ROM:02C6                 sub     b
+ROM:02C7
+ROM:02C7 loc_2C7:
+ROM:02C7                 ld      (unk_FFDE), a
+ROM:02CA                 xor     a
+ROM:02CB                 ld      (unk_FFDD), a
+ROM:02CE                 ld      hl, (unk_3C2D)
+ROM:02D1                 jp      (hl)
+        ENDC
+
+Z80End:
+
+        SECTION "CPMVars",BSS[$2400]
+
+                DS      8
+Rows            DS      1
+                DS      4
+VDCCharCol      DS      1
+                DS      7
+VDCAttr         DS      1
+
+
+        SECTION "CPM8502",BSS[$3000]
+
+CPM_8502:       DS      BIOS_8502_Size
+
+
+        SECTION "CPM.SYS",DATA[$3400]
+
+CpmSys: INCBIN  "CPM+.SYS"
+CpmSysEnd:

@@ -1,12 +1,6 @@
-IOINIT          EQU     $FF84
-MMU_CR          EQU     $FF00
+        INCLUDE "c128.inc"
 
-EnableZ80       EQU     $FFD0   ; 8502 code
-ReturnZ80       EQU     $FFDC   ; -"-   
-Enable6502      EQU     $FFE0   ; Z80 code
-Return6502      EQU     $FFEE   ; -"-
-
-        XREF    Z80Begin
+        XREF    Z80Entry
 
         SECTION "Code",CODE
 
@@ -18,9 +12,9 @@ Return6502      EQU     $FFEE   ; -"-
 
         lda     #$C3            ; Z80 jp
         sta     Return6502
-        lda     #Z80Begin&$FF
+        lda     #Z80Entry&$FF
         sta     Return6502+1
-        lda     #Z80Begin>>8
+        lda     #Z80Entry>>8
         sta     Return6502+2
 
         jmp     EnableZ80
