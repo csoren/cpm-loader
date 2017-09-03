@@ -1,0 +1,6 @@
+        SECTION "Code",CODE
+
+        XDEF    Z80Begin
+
+Z80Begin:
+        rst     8

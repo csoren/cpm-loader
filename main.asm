@@ -1,3 +1,0 @@
-        SECTION "Code",CODE
-        rts
-        
