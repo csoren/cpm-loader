@@ -11,6 +11,8 @@ BIOS_MMUConfig          EQU     $0FAA
 BIOS_MMUConfig_Size     EQU     11
 BIOS_MMUConfig_Last     EQU     BIOS_MMUConfig+BIOS_MMUConfig_Size-1
 
+InitCodeLocation        EQU     $E000
+
         SECTION "Code",CODE
 
         XDEF    Z80Entry
@@ -26,7 +28,6 @@ ClearMemory: MACRO
 
 Z80Entry:
         ld      sp,$3C77
-
         ld      a,$3F
         ld      (MMU_CR),a
 
@@ -45,6 +46,16 @@ Z80Entry:
         ld      bc,BIOS_CPUSwitch_Size
         ldir
 
+        ld      hl,InitCodeStart
+        ld      de,InitCodeLocation
+        ld      bc,InitCodeSize
+        ldir
+
+        jp      InitCodeLocation
+
+InitCodeStart:
+        ORG     InitCodeLocation
+
         ld      a,$C9           ; Z80 RET
         ld      (Return6502),a
         call    Enable6502
@@ -60,9 +71,7 @@ Z80Entry:
         dec     d
         jr      nz,.initializeMMU
 
-        ;ClearMemory $1000,$3000
-        ClearMemory $1000,Z80Entry
-        ClearMemory Z80End,$3000
+        ClearMemory $1000,$3000
 
         ld      a,$1A           ; VDC colors
         call    BIOS_VDCSelectReg
@@ -178,7 +187,14 @@ ROM:02CE                 ld      hl, (unk_3C2D)
 ROM:02D1                 jp      (hl)
         ENDC
 
-Z80End:
+Flash:  ld      bc,$D020
+        xor     a
+.flash        
+        out     (c),a
+        inc     a
+        jr      .flash
+
+InitCodeSize    EQU     @-InitCodeLocation
 
         SECTION "CPMVars",BSS[$2400]
 
