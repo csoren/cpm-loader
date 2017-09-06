@@ -1,6 +1,9 @@
         INCLUDE "c128.inc"
+        INCLUDE "cpmsys.inc"
 
+BIOS_GetStartAndSize    EQU     $0331
 BIOS_PrintAutoText      EQU     $0526
+BIOS_PrintInfoText      EQU     $0534
 BIOS_VDCCopyCharset     EQU     $05BD
 BIOS_VDCSelectReg       EQU     $0945
 BIOS_8502               EQU     $0D22
@@ -32,8 +35,8 @@ Z80Entry:
         ld      (MMU_CR),a
 
         ; Clear memory 3000-FEFF
-        ClearMemory $3000,CpmSys
-        ClearMemory CpmSysEnd,$FF00
+        ;ClearMemory $3000,CpmSys
+        ;ClearMemory CpmSysEnd,$FF00
 
         ; Copy 8502 code to $3000
         ld      hl,BIOS_8502
@@ -71,7 +74,7 @@ InitCodeStart:
         dec     d
         jr      nz,.initializeMMU
 
-        ClearMemory $1000,$3000
+;        ClearMemory $1000,$3000
 
         ld      a,$1A           ; VDC colors
         call    BIOS_VDCSelectReg
@@ -96,96 +99,39 @@ InitCodeStart:
         DB      $0A             ; Column 10
         DB      'BOOTING CP/M PLUS',0
 
-.spin   jr      .spin
+        ld      bc,$D018
+        ld      a,$B6
+        out     (c),a
 
-        IF      0
-ROM:01F0 ; ---------------------------------------------------------------------------
-ROM:0208 ; ---------------------------------------------------------------------------
-ROM:0208                 ld      bc, unk_D018
-ROM:020B                 ld      a, 0B6h ; 'Â'
-ROM:020D                 out     (c), a
-ROM:020F                 call    LoadBootSector
-ROM:0212                 jp      nz, PrintNoCpmSys
-ROM:0215                 ld      hl, 0FB2h
-ROM:0218                 ld      (BlockLoadTable), hl
-ROM:021B                 call    sub_B4
-ROM:021E                 call    sub_B4
-ROM:0221                 ld      hl, (unk_3C09)
-ROM:0224                 ld      a, h
-ROM:0225                 or      l
-ROM:0226                 jp      z, PrintNoCpmSys
-ROM:0229
-ROM:0229 loc_229:                                ; CODE XREF: sub_2FA:loc_321j
-ROM:0229                 ld      hl, 3C09h
-ROM:022C                 ld      (BlockLoadTable), hl
-ROM:022F                 call    sub_36D
-ROM:0232                 ld      hl, 3400h
-ROM:0235                 ld      de, 3C29h
-ROM:0238                 ld      bc, 0Ch
-ROM:023B                 ldir
-ROM:023D                 call    PrintAutoText
-ROM:023D ; ---------------------------------------------------------------------------
-ROM:0240                 db 8Ah
-ROM:0241                 db    0
-ROM:0242                 db 0
-ROM:0243 ; ---------------------------------------------------------------------------
-ROM:0243                 ld      hl, 3480h
-ROM:0246                 call    PrintText
-ROM:0249                 ld      hl, 3500h
-ROM:024C                 ld      (unk_3C04), hl
-ROM:024F                 call    PrintAutoText
-ROM:024F ; ---------------------------------------------------------------------------
-ROM:0252                 db 83h
-ROM:0253                 db 0Ch
-ROM:0254 aDataTables:    .ascii 'DATA TABLES',0
-ROM:0260 ; ---------------------------------------------------------------------------
-ROM:0260                 ld      hl, (unk_3C33)
-ROM:0263                 ld      (unk_FD09), hl
-ROM:0266                 ld      hl, 3C32h
-ROM:0269                 call    sub_331
-ROM:026C                 ld      (unk_FD0B), hl
-ROM:026F
-ROM:026F loc_26F:                                ; CODE XREF: sub_0+276j
-ROM:026F                 call    sub_344
-ROM:0272                 ld      de, 80h ; 'Ç'
-ROM:0275                 add     hl, de
-ROM:0276                 jr      nz, loc_26F
-ROM:0278                 call    PrintAutoText
-ROM:0278 ; ---------------------------------------------------------------------------
-ROM:027B                 db 84h
-ROM:027C                 db 0Ch
-ROM:027D aCommonCode:    .ascii 'COMMON CODE',0
-ROM:0289 ; ---------------------------------------------------------------------------
-ROM:0289                 ld      hl, 3C2Ah
-ROM:028C                 call    sub_324
-ROM:028F                 call    PrintAutoText
-ROM:028F ; ---------------------------------------------------------------------------
-ROM:0292                 db 85h
-ROM:0293                 db 0Ch
-ROM:0294 aBankedCode:    .ascii 'BANKED CODE',0
-ROM:02A0 ; ---------------------------------------------------------------------------
-ROM:02A0                 ld      hl, 3C2Ch
-ROM:02A3                 call    sub_324
-ROM:02A6                 call    PrintAutoText
-ROM:02A6 ; ---------------------------------------------------------------------------
-ROM:02A9                 db 86h
-ROM:02AA                 db 0Ch
-ROM:02AB aBios8502Code:  .ascii 'BIOS8502 CODE',0
-ROM:02B9 ; ---------------------------------------------------------------------------
-ROM:02B9                 ld      hl, 3C30h
-ROM:02BC                 call    sub_324
-ROM:02BF                 ld      a, (unk_3C30)
-ROM:02C2                 ld      b, a
-ROM:02C3                 ld      a, (unk_3C2F)
-ROM:02C6                 sub     b
-ROM:02C7
-ROM:02C7 loc_2C7:
-ROM:02C7                 ld      (unk_FFDE), a
-ROM:02CA                 xor     a
-ROM:02CB                 ld      (unk_FFDD), a
-ROM:02CE                 ld      hl, (unk_3C2D)
-ROM:02D1                 jp      (hl)
-        ENDC
+        call    BIOS_PrintAutoText
+        DB      $8A,0,0
+
+        ld      hl,InfoText
+        call    BIOS_PrintInfoText
+        
+        call    BIOS_PrintAutoText
+        DB      $83,$0C
+        DB      'DATA TABLES',0
+
+        call    BIOS_PrintAutoText
+        DB      $84,$0C
+        DB      'COMMON CODE',0
+
+        call    BIOS_PrintAutoText
+        DB      $85,$0C
+        DB      'BANKED CODE',0
+
+        call    BIOS_PrintAutoText
+        DB      $86,$0C
+        DB      'BIOS8502 CODE',0
+
+        ld      hl,BIOS8502CODE_START
+        ld      ($FFDD),hl
+
+        ld      hl,CPM_START_ADDRESS
+        jp      (hl)
+
+        jp      Flash
 
 Flash:  ld      bc,$D020
         xor     a
@@ -195,6 +141,9 @@ Flash:  ld      bc,$D020
         jr      .flash
 
 InitCodeSize    EQU     @-InitCodeLocation
+
+        SECTION "InitCode",BSS[InitCodeLocation]
+        DS      InitCodeSize
 
         SECTION "CPMVars",BSS[$2400]
 
@@ -211,7 +160,22 @@ VDCAttr         DS      1
 CPM_8502:       DS      BIOS_8502_Size
 
 
-        SECTION "CPM.SYS",DATA[$3400]
+        SECTION "InfoSegment",DATA
+InfoText:       INCBIN  "info.bin"
 
-CpmSys: INCBIN  "CPM+.SYS"
-CpmSysEnd:
+        SECTION "BankedCode",DATA[BANKEDCODE_START]
+        INCBIN  "bankedcode.bin"
+
+        SECTION "8502",DATA[BIOS8502CODE_START]
+        INCBIN  "bios8502code.bin"
+
+        SECTION "CommonCode",DATA
+CommonCodeStart:
+        INCBIN  "commoncode.bin"
+CommonCodeEnd:
+        
+        SECTION "DataTables",DATA
+DataTablesStart:
+        INCBIN  "tables.bin"
+DataTablesEnd:
+        
