@@ -107,7 +107,9 @@ bool extractFromFile (FILE* file, FILE* includeFile) {
     int bios8502CodeSize = fgetc (file);
     int dataTablesLocationStart = fgetc (file);
     int dataTablesCodeSize = fgetc (file);
-    
+    int keyTableLo = fgetc (file);
+    int keyTableHi = fgetc (file);
+
     fprintf (includeFile, "CPM_START_ADDRESS EQU $%02X%02X\n", startAddressHi, startAddressLo);
 
     fseek (file, 0x80, SEEK_SET);
@@ -125,6 +127,8 @@ bool extractFromFile (FILE* file, FILE* includeFile) {
 
     if (!writeBIOS8502Code (file, includeFile, bios8502LocationEnd, bios8502CodeSize))
         return false;
+
+    fprintf (includeFile, "KEYTABLE_START EQU $%02X%02X\n", keyTableHi, keyTableLo);
 
     return true;
 }

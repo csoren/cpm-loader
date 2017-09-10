@@ -27,29 +27,29 @@ FR_\1_40        EQU     \2+FR_40
         DefBIOS RdColor,$44
         DefBIOS WrColor,$48
 
-TrkSect         EQU     $50
-CheckCBM        EQU     $52
-Bell            EQU     $54
+FR_TrkSect      EQU     $50
+FR_CheckCBM     EQU     $52
+FR_Bell         EQU     $54
 
-Trk40           EQU     $60
-SetCur40        EQU     $62
-LinePaint       EQU     $64
-ScreenPaint     EQU     $66
-PrtMsgBoth      EQU     $68
-PrtDeBoth       EQU     $6A
-UpdateIt        EQU     $6C
+FR_Trk40        EQU     $60
+FR_SetCur40     EQU     $62
+FR_LinePaint    EQU     $64
+FR_ScreenPaint  EQU     $66
+FR_PrtMsgBoth   EQU     $68
+FR_PrtDeBoth    EQU     $6A
+FR_UpdateIt     EQU     $6C
 
-ASCIIToPet      EQU     $70
-CurAdr40        EQU     $72
-CurAdr80        EQU     $74
-LookColor       EQU     $76
+FR_ASCIIToPet   EQU     $70
+FR_CurAdr40     EQU     $72
+FR_CurAdr80     EQU     $74
+FR_LookColor    EQU     $76
 
-BlkFill         EQU     $7A     ; HL passed on the stack
-BlkMove         EQU     $7C     ; "
-CharInst        EQU     $7E     ; "
+FR_BlkFill      EQU     $7A     ; HL passed on the stack
+FR_BlkMove      EQU     $7C     ; "
+FR_CharInst     EQU     $7E     ; "
 
 BCALL:  MACRO
-        ld      l,\1
+        ld      l,FR_\1
         rst     $28
         ENDM
 

@@ -2,6 +2,9 @@
         INCLUDE "z80bios.inc"
         INCLUDE "cpmsys.inc"
 
+Parm_KeyTable   EQU     $FD09
+Parm_DataTables EQU     $FD0B
+
 InitCodeLocation        EQU     $E000
 
         SECTION "Code",CODE
@@ -41,13 +44,14 @@ Z80Entry:
 InitCodeStart:
         ORG     InitCodeLocation
 
-        ClearMemory $1000,$4000
+        ClearMemory $1000,Segments_Start
 
         CopyMemory BIOS_8502,BIOS_8502_Size,CPM_8502
         CopyMemory BIOS_CPUSwitch,BIOS_CPUSwitch_Size,EnableZ80
 
         ld      a,$C9           ; Z80 RET
         ld      (Return6502),a
+
         call    Enable6502
 
         ld      hl,BIOS_MMUConfig_Last
@@ -67,15 +71,20 @@ InitCodeStart:
         out     (c),a
 
         ld      a,$83
-        ld      (VDCAttr),a
+        ld      (Parm_CurrentAtr80),a
 
         ld      a,$0E
-        ld      (VICCharCol),a
+        ld      (Parm_Attr40),a
+
+        ld      hl,KEYTABLE_START
+        ld      (Parm_KeyTable),hl
+        ld      hl,DATATABLES_START
+        ld      (Parm_DataTables),hl
 
         call    BIOS_InitCharset
 
         ld      a,$19
-        ld      (Rows),a
+        ld      (Parm_PaintSize),a
 
         BCALL   PrtMsgBoth
         DB      $FF             ; Clear screen
@@ -120,28 +129,8 @@ InitCodeStart:
 
         CopyMemory DataTables,DataTables_Size,DATATABLES_START
 
-        IF      0
-        xor     a,a
-	ld	c,a
-	call	?out40
-	call	prt$msg			; print signon message
-	db	'Z'-'@'			; initialize screen pointers
-	db	esc,esc,esc
-	db	lt$grey+50h             ; set character color
-	db	esc,esc,esc
-	db	blue+60h                ; set background (BG) color
-	db	esc,esc,esc
-	db	black+70h               ; set border color
-        ENDC
-
-        jp      Flash
-
         ld      hl,CPM_START_ADDRESS
         push    hl
-
-;        ClearMemory DATATABLES_START+DataTables_Size,BIOS8502Code
-;        ClearMemory BIOS8502CODE_START+BIOS8502Code_Size,BankedCode
-
 
         ld      hl,InitCodeLocation
         ld      de,InitCodeLocation+1
@@ -189,6 +178,7 @@ InitCodeSize    EQU     InitCodeEnd-InitCodeLocation
 ; -- CPM+.SYS Segments
 ; --
         SECTION "Segments",DATA[$4000]
+Segments_Start:
 
 DataTables:
         INCBIN  "tables.bin"
@@ -215,14 +205,25 @@ Segments_End:
 
         SECTION "CPMVars",BSS[$2400]
 Vars1_Start:
-                DS      8
-Rows            DS      1
-                DS      4
-VICCharCol      DS      1
-VICBackground   DS      1
-VICBorder       DS      1
-                DS      5
-VDCAttr         DS      1
+Parm_Temp:              DS      2
+Parm_CursorOffset:      DS      2
+Parm_OldOffset:         DS      1
+Parm_PrtFlag:           DS      1
+Parm_FlashPos:          DS      2
+Parm_PaintSize:         DS      1
+Parm_CharAdr40:         DS      2
+Parm_CharCol40:         DS      1
+Parm_CharRow40:         DS      1
+Parm_Attr40:            DS      1
+Parm_BgCol40:           DS      1
+Parm_BdCol40:           DS      1
+Parm_Rev40:             DS      1
+Parm_CharAdr80:         DS      2
+Parm_CharCol80:         DS      1
+Parm_CharRow80:         DS      1
+Parm_CurrentAtr80:      DS      1
+Parm_BgCol80:           DS      1
+Parm_CharColor80:       DS      1
 
         SECTION "CPM8502",BSS[$3000]
 
