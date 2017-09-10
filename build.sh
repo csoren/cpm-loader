@@ -13,5 +13,5 @@ rm cpmsys.inc
 ./extract CPM+.SYS
 $asm6502 -fx -omain.o main.65
 $asmz80 -mcz -fx -oloader.o loader.z80
-$link -tc128 -oloader.prg main.o loader.o
+$link -tc128 -ocpm+.prg main.o loader.o
 
