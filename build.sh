@@ -8,6 +8,8 @@ asmz80=asmotor/build/scons/build_gameboy/motorgb
 link=asmotor/build/scons/build_xlink/xlink
 
 gcc -oextract extract.c
+rm *.bin
+rm cpmsys.inc
 ./extract CPM+.SYS
 $asm6502 -fx -omain.o main.65
 $asmz80 -mcz -fx -oloader.o loader.z80

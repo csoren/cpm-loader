@@ -1,18 +1,6 @@
         INCLUDE "c128.inc"
+        INCLUDE "z80bios.inc"
         INCLUDE "cpmsys.inc"
-
-BIOS_GetStartAndSize    EQU     $0331
-BIOS_PrintAutoText      EQU     $0526
-BIOS_PrintInfoText      EQU     $0534
-BIOS_VDCCopyCharset     EQU     $05BD
-BIOS_VDCSelectReg       EQU     $0945
-BIOS_8502               EQU     $0D22
-BIOS_8502_Size          EQU     $1C3
-BIOS_CPUSwitch          EQU     $0EE5
-BIOS_CPUSwitch_Size     EQU     31
-BIOS_MMUConfig          EQU     $0FAA
-BIOS_MMUConfig_Size     EQU     11
-BIOS_MMUConfig_Last     EQU     BIOS_MMUConfig+BIOS_MMUConfig_Size-1
 
 InitCodeLocation        EQU     $E000
 
@@ -29,25 +17,19 @@ ClearMemory: MACRO
         ldir
         ENDM
 
+CopyMemory: MACRO
+        ld      hl,\1
+        ld      de,\3
+        ld      bc,\2
+        call    memcpy
+        ENDM
+
 Z80Entry:
-        ld      sp,$3C77
+        ld      sp,StackTop
         ld      a,$3F
         ld      (MMU_CR),a
 
-        ; Clear memory 3000-FEFF
-        ;ClearMemory $3000,CpmSys
-        ;ClearMemory CpmSysEnd,$FF00
-
-        ; Copy 8502 code to $3000
-        ld      hl,BIOS_8502
-        ld      de,CPM_8502
-        ld      bc,BIOS_8502_Size
-        ldir
-
-        ld      hl,BIOS_CPUSwitch
-        ld      de,EnableZ80
-        ld      bc,BIOS_CPUSwitch_Size
-        ldir
+        ClearMemory Segments_End,$FF00
 
         ld      hl,InitCodeStart
         ld      de,InitCodeLocation
@@ -58,6 +40,11 @@ Z80Entry:
 
 InitCodeStart:
         ORG     InitCodeLocation
+
+        ClearMemory $1000,$4000
+
+        CopyMemory BIOS_8502,BIOS_8502_Size,CPM_8502
+        CopyMemory BIOS_CPUSwitch,BIOS_CPUSwitch_Size,EnableZ80
 
         ld      a,$C9           ; Z80 RET
         ld      (Return6502),a
@@ -74,10 +61,8 @@ InitCodeStart:
         dec     d
         jr      nz,.initializeMMU
 
-;        ClearMemory $1000,$3000
-
         ld      a,$1A           ; VDC colors
-        call    BIOS_VDCSelectReg
+        call    BIOS_Wait
         ld      a,$90
         out     (c),a
 
@@ -85,15 +70,14 @@ InitCodeStart:
         ld      (VDCAttr),a
 
         ld      a,$0E
-        ld      (VDCCharCol),a
+        ld      (VICCharCol),a
 
-        call    BIOS_VDCCopyCharset
+        call    BIOS_InitCharset
 
         ld      a,$19
         ld      (Rows),a
 
-        call    BIOS_PrintAutoText
-        
+        BCALL   PrtMsgBoth
         DB      $FF             ; Clear screen
         DB      $81             ; Line 1
         DB      $0A             ; Column 10
@@ -103,35 +87,68 @@ InitCodeStart:
         ld      a,$B6
         out     (c),a
 
-        call    BIOS_PrintAutoText
+        BCALL   PrtMsgBoth
         DB      $8A,0,0
 
         ld      hl,InfoText
-        call    BIOS_PrintInfoText
+        call    BIOS_PrintText
         
-        call    BIOS_PrintAutoText
+        BCALL   PrtMsgBoth
         DB      $83,$0C
-        DB      'DATA TABLES',0
-
-        call    BIOS_PrintAutoText
-        DB      $84,$0C
         DB      'COMMON CODE',0
 
-        call    BIOS_PrintAutoText
-        DB      $85,$0C
+        CopyMemory CommonCode,CommonCode_Size,COMMONCODE_START
+
+        BCALL   PrtMsgBoth
+        DB      $84,$0C
         DB      'BANKED CODE',0
 
-        call    BIOS_PrintAutoText
-        DB      $86,$0C
+        CopyMemory BankedCode,BankedCode_Size,BANKEDCODE_START
+
+        BCALL   PrtMsgBoth
+        DB      $85,$0C
         DB      'BIOS8502 CODE',0
 
-        ld      hl,BIOS8502CODE_START
-        ld      ($FFDD),hl
+        CopyMemory BIOS8502Code,BIOS8502Code_Size,BIOS8502CODE_START
 
-        ld      hl,CPM_START_ADDRESS
-        jp      (hl)
+        ld      hl,BIOS8502CODE_START
+        ld      (ReturnZ80+1),hl
+
+        BCALL   PrtMsgBoth
+        DB      $86,$0C
+        DB      'DATA TABLES',0
+
+        CopyMemory DataTables,DataTables_Size,DATATABLES_START
+
+        IF      0
+        xor     a,a
+	ld	c,a
+	call	?out40
+	call	prt$msg			; print signon message
+	db	'Z'-'@'			; initialize screen pointers
+	db	esc,esc,esc
+	db	lt$grey+50h             ; set character color
+	db	esc,esc,esc
+	db	blue+60h                ; set background (BG) color
+	db	esc,esc,esc
+	db	black+70h               ; set border color
+        ENDC
 
         jp      Flash
+
+        ld      hl,CPM_START_ADDRESS
+        push    hl
+
+;        ClearMemory DATATABLES_START+DataTables_Size,BIOS8502Code
+;        ClearMemory BIOS8502CODE_START+BIOS8502Code_Size,BankedCode
+
+
+        ld      hl,InitCodeLocation
+        ld      de,InitCodeLocation+1
+        ld      bc,COMMONCODE_START-InitCodeLocation-1
+        xor     a
+        ld      (hl),a
+        jp      BIOS_LDIR_RET
 
 Flash:  ld      bc,$D020
         xor     a
@@ -140,42 +157,82 @@ Flash:  ld      bc,$D020
         inc     a
         jr      .flash
 
-InitCodeSize    EQU     @-InitCodeLocation
+memcpy:
+        call    BIOS_CmpHlDe
+        jr      c,.up
+.down   ldir
+        ret
+.up     dec     bc
+        ex      hl,de
+        add     hl,bc
+        ex      hl,de
+        add     hl,bc
+        inc     bc
+        lddr
+        ret        
+
+InfoText:
+        INCBIN  "info.bin"
+
+InitCodeEnd:
+
+        IF      InitCodeEnd>COMMONCODE_START
+        ERROR   "Init code segment too large"
+        ENDC
+
+InitCodeSize    EQU     InitCodeEnd-InitCodeLocation
 
         SECTION "InitCode",BSS[InitCodeLocation]
         DS      InitCodeSize
 
-        SECTION "CPMVars",BSS[$2400]
+; --
+; -- CPM+.SYS Segments
+; --
+        SECTION "Segments",DATA[$4000]
 
+DataTables:
+        INCBIN  "tables.bin"
+DataTables_End:
+DataTables_Size EQU     DataTables_End-DataTables
+
+BIOS8502Code:
+        INCBIN  "bios8502code.bin"
+BIOS8502Code_End:
+BIOS8502Code_Size EQU   BIOS8502Code_End-BIOS8502Code
+
+BankedCode:
+        INCBIN  "bankedcode.bin"
+BankedCode_End:
+BankedCode_Size EQU     BankedCode_End-BankedCode
+
+CommonCode:
+        INCBIN  "commoncode.bin"
+CommonCode_End:
+CommonCode_Size EQU     CommonCode_End-CommonCode
+
+Segments_End:
+
+
+        SECTION "CPMVars",BSS[$2400]
+Vars1_Start:
                 DS      8
 Rows            DS      1
                 DS      4
-VDCCharCol      DS      1
-                DS      7
+VICCharCol      DS      1
+VICBackground   DS      1
+VICBorder       DS      1
+                DS      5
 VDCAttr         DS      1
-
 
         SECTION "CPM8502",BSS[$3000]
 
 CPM_8502:       DS      BIOS_8502_Size
 
+        SECTION "CPMVars2",BSS[$3C00]
 
-        SECTION "InfoSegment",DATA
-InfoText:       INCBIN  "info.bin"
-
-        SECTION "BankedCode",DATA[BANKEDCODE_START]
-        INCBIN  "bankedcode.bin"
-
-        SECTION "8502",DATA[BIOS8502CODE_START]
-        INCBIN  "bios8502code.bin"
-
-        SECTION "CommonCode",DATA
-CommonCodeStart:
-        INCBIN  "commoncode.bin"
-CommonCodeEnd:
-        
-        SECTION "DataTables",DATA
-DataTablesStart:
-        INCBIN  "tables.bin"
-DataTablesEnd:
-        
+Vars2_Start:
+                DS      4
+pDataTable:     DS      2
+                DS      1
+                DS      $70
+StackTop:
