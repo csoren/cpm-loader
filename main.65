@@ -1,0 +1,20 @@
+        INCLUDE "c128.inc"
+
+        XREF    Z80Entry
+
+        SECTION "Code",CODE
+
+        sei
+        jsr     IOINIT
+
+        lda     #$3E            ; = 00,11,11,1,0
+        sta     MMU_CR          ; MMU: Bank 0, all RAM, only I/O
+
+        lda     #$C3            ; Z80 jp
+        sta     Return6502
+        lda     #Z80Entry&$FF
+        sta     Return6502+1
+        lda     #Z80Entry>>8
+        sta     Return6502+2
+
+        jmp     EnableZ80

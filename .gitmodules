@@ -1,0 +1,4 @@
+[submodule "asmotor"]
+	path = asmotor
+	url = https://github.com/csoren/asmotor
+	branch = develop
