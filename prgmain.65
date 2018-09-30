@@ -2,8 +2,10 @@
 
         XREF    Z80Entry
 
-        SECTION "Code",CODE
+        XDEF    ProgramEntry
 
+        SECTION "Code",CODE
+ProgramEntry:
         sei
         jsr     IOINIT
 

@@ -1,0 +1,6 @@
+        SECTION "Z80Code",CODE[$E000]
+
+        XDEF    Z80Entry
+
+Z80Entry:
+        ret

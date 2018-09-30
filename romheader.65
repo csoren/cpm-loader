@@ -1,0 +1,7 @@
+        XREF    ProgramEntry
+
+        SECTION "ROMHeader",CODE
+
+        jmp     ProgramEntry
+        jmp     ProgramEntry
+        DB      1,"CBM"

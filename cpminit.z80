@@ -1,0 +1,95 @@
+
+        ClearMemory $1000,Segments_Start
+
+        CopyMemory BIOS_8502,BIOS_8502_Size,CPM_8502
+        CopyMemory BIOS_CPUSwitch,BIOS_CPUSwitch_Size,EnableZ80
+
+        ld      a,$C9           ; Z80 RET
+        ld      (Return6502),a
+
+        call    Enable6502
+
+        ld      hl,BIOS_MMUConfig_Last
+        ld      bc,$D50A
+        ld      d,BIOS_MMUConfig_Size
+.initializeMMU
+        ld      a,(hl)
+        out     (c),a
+        dec     hl
+        dec     c
+        dec     d
+        jr      nz,.initializeMMU
+
+        ld      a,$1A           ; VDC colors
+        call    BIOS_Wait
+        ld      a,$90
+        out     (c),a
+
+        ld      a,$83
+        ld      (Parm_CurrentAtr80),a
+
+        ld      a,$0E
+        ld      (Parm_Attr40),a
+
+        ld      hl,KEYTABLE_START
+        ld      (Parm_KeyTable),hl
+        ld      hl,DATATABLES_START
+        ld      (Parm_DataTables),hl
+
+        call    BIOS_InitCharset
+
+        ld      a,$19
+        ld      (Parm_PaintSize),a
+
+        BCALL   PrtMsgBoth
+        DB      $FF             ; Clear screen
+        DB      $81             ; Line 1
+        DB      $0A             ; Column 10
+        DB      'BOOTING CP/M PLUS',0
+
+        ld      bc,$D018
+        ld      a,$B6
+        out     (c),a
+
+        BCALL   PrtMsgBoth
+        DB      $8A,0,0
+
+        ld      hl,InfoText
+        call    BIOS_PrintText
+        
+        BCALL   PrtMsgBoth
+        DB      $83,$0C
+        DB      'COMMON CODE',0
+
+        CopyMemory CommonCode,CommonCode_Size,COMMONCODE_START
+
+        BCALL   PrtMsgBoth
+        DB      $84,$0C
+        DB      'BANKED CODE',0
+
+        CopyMemory BankedCode,BankedCode_Size,BANKEDCODE_START
+
+        BCALL   PrtMsgBoth
+        DB      $85,$0C
+        DB      'BIOS8502 CODE',0
+
+        CopyMemory BIOS8502Code,BIOS8502Code_Size,BIOS8502CODE_START
+
+        ld      hl,BIOS8502CODE_START
+        ld      (ReturnZ80+1),hl
+
+        BCALL   PrtMsgBoth
+        DB      $86,$0C
+        DB      'DATA TABLES',0
+
+        CopyMemory DataTables,DataTables_Size,DATATABLES_START
+
+        ld      hl,CPM_START_ADDRESS
+        push    hl
+
+        ld      hl,InitCodeLocation
+        ld      de,InitCodeLocation+1
+        ld      bc,COMMONCODE_START-InitCodeLocation-1
+        xor     a
+        ld      (hl),a
+        jp      BIOS_LDIR_RET

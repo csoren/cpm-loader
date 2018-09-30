@@ -11,7 +11,11 @@ gcc -oextract extract.c
 rm *.bin
 rm cpmsys.inc
 ./extract CPM+.SYS
-$asm6502 -fx -omain.o main.65
-$asmz80 -mcz -fx -oloader.o loader.z80
-$link -tc128 -ocpm+.prg main.o loader.o
+$asm6502 -fx -oprgmain.o prgmain.65
+$asmz80 -mcz -fx -oprgloader.o prgloader.z80
+$link -tc128 -ocpm+.prg prgmain.o prgloader.o
+
+$asm6502 -fx -oromheader.o romheader.65
+$asmz80 -mcz -fx -oromloader.o romloader.z80
+$link -tc128f -ocpm+.rom romheader.o prgmain.o romloader.o
 
